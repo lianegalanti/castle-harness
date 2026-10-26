@@ -88,6 +88,12 @@ bash scripts/render.sh TRAJECTORY ATTEMPT_DIR EPISODE_JSONL OUTPUT_MP4 [MIDDLE_P
 
 ## Known limitations
 
-* `run_python` is not sandboxed.
-* Several `move_part` calls in one model turn are all executed.
+* `run_python` runs in isolated mode with a minimal environment, but it is not a
+  sandbox: the model's code can still read absolute paths on the filesystem.
 * One episode per task.
+
+The results in `results/` were produced by the code on the `main` branch. This
+`dev` branch fixes issues found afterwards: only one `move_part` runs per turn, the
+`get_task` description matches the image-only setting, `run_python` no longer
+inherits the harness environment, episode logs store only each turn's new messages
+with relative image paths, and temporary episode folders are removed.
