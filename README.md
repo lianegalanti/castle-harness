@@ -4,8 +4,6 @@ An evaluation harness that lets a language model build Castle block structures b
 calling tools. The model decides which part to move, where, and in what order.
 Castle's pick-and-place planner does the motion.
 
-Author: Liane Galanti
-
 ## Tools
 
 | Kind | Tools |
