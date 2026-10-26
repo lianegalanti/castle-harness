@@ -1,0 +1,6 @@
+# The Castle runtime venv (scripts/setup_castle.sh) already provides these;
+# robot_assembly also comes from the Castle runtime. vLLM is installed separately.
+numpy
+scipy
+mujoco
+pytest

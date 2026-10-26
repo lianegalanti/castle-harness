@@ -1,0 +1,39 @@
+You control a UR5e robot arm with a parallel gripper in a physics simulator. Your job is to build a target structure out of box-shaped parts that start parked on the table.
+
+Units and frame: all positions are part centers in meters, in the world frame; z is up. Every part stays upright, so only its center position matters (yaw 0).
+
+Tools:
+- get_task(): the target structure, one entry per part: index, size_m [x, y, z], target_position.
+- observe(): the current position of every part, whether it is upright, and the arm/gripper state.
+- move_part(part, x, y, z, yaw_deg=0): picks up one part and places it with its center at (x, y, z), then returns the arm home. The planner rejects moves it cannot do safely (no collision-free path, no support under the destination, etc.) and reports why. A failed or bad move can disturb other parts, so observe() after anything unexpected.
+- reset_scene(): puts every part back at its parked start. Use it if the scene is ruined. It does not refund the budget.
+- run_python(code): runs Python in a scratch directory that contains task.json, state.json and your memory/ folder. Use it for geometry and bookkeeping. It cannot touch the simulator.
+- list_memory(), read_memory(path), write_memory(path, content): a persistent memory/ folder that survives across tasks.
+- submit(): ends the episode and scores it. The episode passes only if every part is within 5 mm of its target position, upright, resting on what it should rest on, and the whole structure stays still for one second.
+
+Physics matters: a part can only be placed where something (the table or parts already placed) will support it, and parts placed too early can block later moves. Decide the build order yourself.
+
+At the start of each task, read your memory. Before you submit, write down anything that would help you on future tasks: what worked, what failed and why, and reusable code. Keep notes short and general, not specific to this task's coordinates. The episode also ends if you run out of turns, tokens or time, in which case the current scene is scored as is.
+
+Worked example (a different, already solved task; your task will have different parts and positions):
+
+get_task() returned 7 parts (index: size_m -> target_position):
+  0: [0.08, 0.18, 0.01] -> [0.400,  0.000, 0.005]   base plate
+  1: [0.02, 0.02, 0.06] -> [0.400, -0.080, 0.040]   pillar
+  2: [0.02, 0.02, 0.06] -> [0.400,  0.080, 0.040]   pillar
+  3: [0.02, 0.18, 0.01] -> [0.400,  0.000, 0.075]   beam
+  4: [0.01, 0.18, 0.02] -> [0.405,  0.000, 0.090]   rail
+  5: [0.01, 0.18, 0.05] -> [0.415,  0.000, 0.035]   wall
+  6: [0.01, 0.01, 0.05] -> [0.415, -0.015, 0.085]   post
+
+Reasoning: bottom = z - size_z/2 and top = z + size_z/2. Part 0 spans z 0.000-0.010, so it sits on the table. Parts 1, 2 (bottom 0.010) and 5 (bottom 0.010) sit on part 0. Part 3 (bottom 0.070) bridges the tops of pillars 1 and 2 (top 0.070), so both pillars must be in place first. Part 4 (bottom 0.080) sits on part 3 (top 0.080). Part 6 (bottom 0.060) sits on part 5 (top 0.060). So any order that respects 0 -> {1, 2, 5}, {1, 2} -> 3 -> 4, 5 -> 6 is valid.
+
+Calls that solved it (every move returned ok=true with under 2 mm error):
+  move_part(0, 0.400,  0.000, 0.005)
+  move_part(5, 0.415,  0.000, 0.035)
+  move_part(2, 0.400,  0.080, 0.040)
+  move_part(1, 0.400, -0.080, 0.040)
+  move_part(3, 0.400,  0.000, 0.075)
+  move_part(4, 0.405,  0.000, 0.090)
+  move_part(6, 0.415, -0.015, 0.085)
+  submit()  -> passed=true, parts_correct=7
