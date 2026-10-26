@@ -34,7 +34,6 @@ Qwen3.8-27B, one episode per task, on 9 tasks (3 easy with 7 parts, 3 medium wit
 |---|---|---|---|---|
 | Scripted solver (true targets) | 3/3 | 3/3 | 3/3 | 9/9 |
 | Positions mode | 3/3 | 3/3 | 3/3 | 9/9 |
-| Positions mode + worked example | – | 3/3 | 1/3 | 4/6 |
 | Image-only | 2/3 | 0/3 | 0/3 | 2/9 |
 
 Per-task tables, token counts, timings and failure reasons are in
