@@ -9,6 +9,11 @@ Both revisions are explicit in `pixi.toml`; `pixi.lock` records the complete
 resolved environment. The installed-Git regression checks actual package origins,
 commit IDs, and the runtime subdirectory.
 
+`pixi run --locked check-runtime` requires a working NVIDIA GPU. It verifies
+source/build identity and takes finite native MuJoCo and CUDA MuJoCo-Warp steps;
+it exits with an error when CUDA is unavailable. Full robot episodes remain a
+separate check.
+
 The harness imports `castle_reasoning.runtime` and creates a policy-free runtime
 session. It supplies requested moves to the runtime stage coordinator and uses
 its physics, motion planning, and success checks. Dataset path helpers locate

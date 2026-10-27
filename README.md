@@ -50,7 +50,7 @@ pixi run --locked download-tasks
 ```
 
 The manifest pins both installable distributions to public benchmark commit
-[`4da3f207`](https://github.com/smbml/castle-reasoning-benchmark/tree/4da3f2076990acb858984ae24a8f3609cc105b3a):
+[`06c65431`](https://github.com/smbml/castle-reasoning-benchmark/tree/06c65431640a96e5eadec37ffeb553279fb51f4b):
 `castle-reasoning-benchmark` and the patched `mujoco-warp` package from
 `third_party/mujoco-warp`. The committed `pixi.lock` fixes the complete harness
 environment. Updating the benchmark requires updating both revisions together
@@ -65,6 +65,8 @@ revision and verify their source identities and hashes. Both published campaigns
 are supported: 570 `S` targets and 502 `U` targets, totaling 1,072 structures.
 For targets with multiple demonstrations, downloading selects the first accepted
 indexed attempt. Files retain their original campaign paths.
+The default download budget is 1 GiB to fit the nine paper tasks; pass
+`--max-download-mb` to set another limit.
 
 The runner searches both downloaded indices for the first locally available
 accepted attempt per requested target. `CASTLE_INDEX` explicitly selects one
@@ -109,8 +111,9 @@ pixi run --locked run-level2
 Download every requested task explicitly before running. `BASE_URL`, `MODEL`,
 `DEVICE`, and `OUT_ROOT` retain their existing meanings. The existing `run.py`
 CLI is also available through `pixi run --locked run`.
-The native runtime check validates installation and a MuJoCo step; it does not
-execute a GPU episode or measure language-model performance.
+The runtime check requires a working NVIDIA GPU and validates installation plus
+native MuJoCo and CUDA MuJoCo-Warp steps. It does not execute a full robot episode
+or measure language-model performance.
 
 Render a saved recording:
 

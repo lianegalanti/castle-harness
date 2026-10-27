@@ -11,8 +11,8 @@ ffmpeg = "*"
 
 # Keep both distributions on the same reviewed benchmark revision.
 [pypi-dependencies]
-castle-reasoning-benchmark = { git = "https://github.com/smbml/castle-reasoning-benchmark.git", rev = "4da3f2076990acb858984ae24a8f3609cc105b3a", extras = ["download"] }
-mujoco-warp = { git = "https://github.com/smbml/castle-reasoning-benchmark.git", rev = "4da3f2076990acb858984ae24a8f3609cc105b3a", subdirectory = "third_party/mujoco-warp" }
+castle-reasoning-benchmark = { git = "https://github.com/smbml/castle-reasoning-benchmark.git", rev = "06c65431640a96e5eadec37ffeb553279fb51f4b", extras = ["download"] }
+mujoco-warp = { git = "https://github.com/smbml/castle-reasoning-benchmark.git", rev = "06c65431640a96e5eadec37ffeb553279fb51f4b", subdirectory = "third_party/mujoco-warp" }
 
 [activation.env]
 MUJOCO_GL = "egl"

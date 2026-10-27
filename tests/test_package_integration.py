@@ -248,18 +248,22 @@ def test_explicit_index_overrides_both_packaged_defaults(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("tasks", "arguments", "expected", "root"),
+    ("tasks", "arguments", "expected", "root", "max_mb"),
     [
-        (None, [], PAPER_TASKS, None),
-        ("", [], PAPER_TASKS, None),
-        ("S0074,U0008", [], "S0074,U0008", None),
-        ("U0008", ["--tasks", "S0074"], "S0074", None),
-        (None, ["--root", "custom-data"], PAPER_TASKS, "custom-data"),
-        (None, ["--tasks", "U0080", "--root", "custom-data"], "U0080", "custom-data"),
+        (None, [], PAPER_TASKS, None, 1024),
+        ("", [], PAPER_TASKS, None, 1024),
+        ("S0074,U0008", [], "S0074,U0008", None, 1024),
+        ("U0008", ["--tasks", "S0074"], "S0074", None, 1024),
+        (None, ["--root", "custom-data"], PAPER_TASKS, "custom-data", 1024),
+        (
+            None, ["--tasks", "U0080", "--root", "custom-data"],
+            "U0080", "custom-data", 1024,
+        ),
+        (None, ["--max-download-mb", "64"], PAPER_TASKS, None, 64),
     ],
 )
 def test_download_script_calls_installed_castle_reasoning_cli(
-    tmp_path, tasks, arguments, expected, root
+    tmp_path, tasks, arguments, expected, root, max_mb
 ):
     binary = tmp_path / "bin"
     binary.mkdir()
@@ -273,7 +277,7 @@ def test_download_script_calls_installed_castle_reasoning_cli(
         "recorded = {'argv': sys.argv[1:], 'pythonpath': os.environ.get('PYTHONPATH')}\n"
         "from castle_reasoning import cli\n"
         "def download(tasks, root, **kwargs):\n"
-        "    recorded.update(tasks=tasks, root=root)\n"
+        "    recorded.update(tasks=tasks, root=root, max_bytes=kwargs['max_bytes'])\n"
         "    return {'repo_id': 'fixture', 'revision': 'fixture', 'files': {},\n"
         "            'tasks': dict.fromkeys(tasks), 'selected_bytes': 0}\n"
         "cli.data_download.download_tasks = download\n"
@@ -307,4 +311,5 @@ def test_download_script_calls_installed_castle_reasoning_cli(
     ]
     assert recorded["tasks"] == expected.split(",")
     assert recorded["root"] == root
+    assert recorded["max_bytes"] == max_mb * 1024 * 1024
     assert recorded["pythonpath"] == os.environ.get("PYTHONPATH")
