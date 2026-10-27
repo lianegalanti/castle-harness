@@ -46,7 +46,7 @@ Model serving remains a separate environment.
 ```bash
 pixi install --locked
 pixi run --locked check-runtime
-pixi run --locked download-tasks --tasks S0507,U0008
+pixi run --locked download-tasks
 ```
 
 The manifest pins both installable distributions to public benchmark commit
@@ -73,10 +73,24 @@ and tests do not download data or generate new campaigns.
 
 ## Running
 
+Omitting `--tasks` selects the paper's nine-task benchmark, all from the
+October 11 campaign (`campaign-tasks-20261011`):
+
+| Difficulty | Parts | Task IDs |
+| --- | --- | --- |
+| Easy | 7 | `U0008`, `U0080`, `U0149` |
+| Medium | 19–24 | `U0002`, `U0007`, `U0011` |
+| Hard | 29–31 | `U0012`, `U0024`, `U0052` |
+
+The downloader and scripted command use the same default. Pass `--tasks` to
+`pixi run --locked run` or `pixi run --locked download-tasks` to select another
+set; `TASKS` also overrides the downloader and scripted command defaults.
+For example, `TASKS=U0008 pixi run --locked run-scripted` runs a single task.
+
 Run the deterministic reference without a model server:
 
 ```bash
-TASKS=S0507,U0008 pixi run --locked run-scripted
+pixi run --locked run-scripted
 ```
 
 For language-model evaluation, serve the model separately with
@@ -89,8 +103,8 @@ pixi run --locked run-level2
 ```
 
 Download every requested task explicitly before running. `BASE_URL`, `MODEL`,
-`DEVICE`, and `OUT_ROOT` retain their existing meanings; `TASKS` selects scripted
-tasks. The existing `run.py` CLI is also available through `pixi run --locked run`.
+`DEVICE`, and `OUT_ROOT` retain their existing meanings. The existing `run.py`
+CLI is also available through `pixi run --locked run`.
 The native runtime check validates installation and a MuJoCo step; it does not
 execute a GPU episode or measure language-model performance.
 

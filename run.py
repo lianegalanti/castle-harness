@@ -20,6 +20,7 @@ from castle_harness.backends import (
     ScriptedBackend,
 )
 from castle_harness.env import CastleEnv
+from castle_harness.tasks import DEFAULT_TASKS
 
 CASTLE_ROOT = paths.dataset_root()
 
@@ -132,7 +133,11 @@ def make_backend(
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tasks", required=True)
+    parser.add_argument(
+        "--tasks",
+        default=DEFAULT_TASKS,
+        help=f"Comma-separated task IDs (default paper benchmark: {DEFAULT_TASKS})",
+    )
     parser.add_argument("--order-seed", type=int, default=0)
     parser.add_argument("--condition", choices=["keep", "wipe"], default="keep")
     parser.add_argument(

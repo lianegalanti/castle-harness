@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-TASKS="${TASKS:-U0006}"
+TASKS="${TASKS:-$(python -c 'from castle_harness.tasks import DEFAULT_TASKS; print(DEFAULT_TASKS)')}"
 OUT_ROOT="${OUT_ROOT:-$ROOT/runs}"
 OUT="$OUT_ROOT/scripted_${TASKS//,/_}"
 if [[ -e "$OUT" ]]; then
