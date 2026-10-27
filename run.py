@@ -11,6 +11,8 @@ from pathlib import Path
 
 import numpy as np
 
+import castle_reasoning.data.paths as paths
+
 from castle_harness.agent import Budgets, run_episode
 from castle_harness.backends import (
     AnthropicBackend,
@@ -19,19 +21,13 @@ from castle_harness.backends import (
 )
 from castle_harness.env import CastleEnv
 
-try:
-    CASTLE_ROOT = Path(os.environ["CASTLE_ROOT"]).expanduser()
-except KeyError as exc:
-    raise RuntimeError(
-        "CASTLE_ROOT is required; set it to the Castle runtime checkout"
-    ) from exc
+CASTLE_ROOT = paths.dataset_root()
 
-INDEX = Path(
-    os.environ.get(
-        "CASTLE_INDEX",
-        str(CASTLE_ROOT / "artifacts/campaign-tasks-20261011/index.json"),
-    )
-).expanduser()
+INDEXES = (
+    [Path(os.environ["CASTLE_INDEX"]).expanduser()]
+    if "CASTLE_INDEX" in os.environ
+    else paths.dataset_indexes(CASTLE_ROOT)
+)
 
 
 def failure_category(episode: dict) -> str:
@@ -97,20 +93,23 @@ def result_row(
 
 def resolve_attempts(target_ids: list[str]) -> dict[str, Path]:
     """Resolve requested IDs to locally downloaded accepted attempt directories."""
-    index = json.loads(INDEX.read_text())
     resolved = {}
-    for target_id in target_ids:
-        candidates = [
-            row for row in index["demonstrations"] if row["target_id"] == target_id
-        ]
-        for row in candidates:
-            path = INDEX.parent / row["attempt_directory"]
+    requested = set(target_ids)
+    for index_path in INDEXES:
+        if not index_path.is_file():
+            continue
+        index = json.loads(index_path.read_text())
+        for row in index["demonstrations"]:
+            target_id = row["target_id"]
+            if target_id not in requested or target_id in resolved:
+                continue
+            path = index_path.parent / row["attempt_directory"]
             if (path / "plan.json").is_file():
                 resolved[target_id] = path
-                break
+    for target_id in target_ids:
         if target_id not in resolved:
             raise FileNotFoundError(f"no downloaded accepted attempt for {target_id}")
-    return resolved
+    return {target_id: resolved[target_id] for target_id in target_ids}
 
 
 def make_backend(

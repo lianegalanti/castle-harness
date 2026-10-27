@@ -3,8 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-: "${CASTLE_ROOT:?Set CASTLE_ROOT to the Castle runtime checkout first}"
-export PYTHONPATH="$CASTLE_ROOT/.runtime-active:$CASTLE_ROOT:$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
 OUT_ROOT="${OUT_ROOT:-$ROOT/runs}"
 OUT="$OUT_ROOT/out_qwen38_keep_ml_worked"
@@ -15,7 +13,7 @@ fi
 
 # Reconstructed from the captured worked-process prefix; the stored argv was
 # truncated after --request-time and did not preserve a complete command.
-exec "${CASTLE_ROOT}/.venv/bin/python" "$ROOT/run.py" \
+exec python "$ROOT/run.py" \
   --backend openai \
   --base-url "${BASE_URL:-http://127.0.0.1:8104/v1}" \
   --model "${MODEL:-Qwen/Qwen3.8-27B}" \

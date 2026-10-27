@@ -3,8 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-: "${CASTLE_ROOT:?Set CASTLE_ROOT to the Castle runtime checkout first}"
-export PYTHONPATH="$CASTLE_ROOT/.runtime-active:$CASTLE_ROOT:$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
 if [[ $# -lt 4 || $# -gt 5 ]]; then
   printf 'Usage: %s TRAJECTORY ATTEMPT_DIR EPISODE_LOG OUTPUT_MP4 [STILL_PNG]\n' \
@@ -23,7 +21,7 @@ if [[ -n "$still" ]]; then
 fi
 
 # Reconstructed HD settings from the approved high-resolution renders.
-exec "${CASTLE_ROOT}/.venv/bin/python" "$ROOT/render_episode.py" \
+exec python "$ROOT/render_episode.py" \
   --trajectory "$trajectory" \
   --model "$attempt_dir/model.mjb" \
   --attempt-dir "$attempt_dir" \

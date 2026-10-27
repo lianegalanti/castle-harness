@@ -1,0 +1,31 @@
+[workspace]
+name = "castle-harness"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = "3.12.*"
+pip = "*"
+pytest = "8.4.2.*"
+ffmpeg = "*"
+
+# Keep both distributions on the same reviewed benchmark revision.
+[pypi-dependencies]
+castle-reasoning-benchmark = { git = "https://github.com/smbml/castle-reasoning-benchmark.git", rev = "4da3f2076990acb858984ae24a8f3609cc105b3a", extras = ["download"] }
+mujoco-warp = { git = "https://github.com/smbml/castle-reasoning-benchmark.git", rev = "4da3f2076990acb858984ae24a8f3609cc105b3a", subdirectory = "third_party/mujoco-warp" }
+
+[activation.env]
+MUJOCO_GL = "egl"
+OPENBLAS_NUM_THREADS = "1"
+OMP_NUM_THREADS = "1"
+
+[tasks]
+test = "python -m pytest -q tests"
+check-runtime = "castle-benchmark check-runtime"
+download-tasks = "bash scripts/download_tasks.sh"
+run = "python run.py"
+run-scripted = "bash scripts/run_scripted.sh"
+run-level1 = "bash scripts/run_level1.sh"
+run-level1-worked = "bash scripts/run_level1_worked.sh"
+run-level2 = "bash scripts/run_level2.sh"
+render = "bash scripts/render.sh"

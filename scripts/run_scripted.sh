@@ -3,8 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-: "${CASTLE_ROOT:?Set CASTLE_ROOT to the Castle runtime checkout first}"
-export PYTHONPATH="$CASTLE_ROOT/.runtime-active:$CASTLE_ROOT:$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
 TASKS="${TASKS:-U0006}"
 OUT_ROOT="${OUT_ROOT:-$ROOT/runs}"
@@ -15,7 +13,7 @@ if [[ -e "$OUT" ]]; then
 fi
 
 # Recovered invocation shape (the output path here is reconstructed).
-exec "${CASTLE_ROOT}/.venv/bin/python" "$ROOT/run.py" \
+exec python "$ROOT/run.py" \
   --backend scripted \
   --tasks "$TASKS" \
   --out "$OUT" \
