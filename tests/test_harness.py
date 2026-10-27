@@ -389,6 +389,8 @@ def test_resume_skips_completed_tasks_and_preserves_keep_memory(monkeypatch, tmp
             "scripted",
             "--out",
             str(output),
+            "--condition",
+            "keep",
             "--resume",
         ],
     )
