@@ -87,6 +87,10 @@ The downloader and scripted command use the same default. Pass `--tasks` to
 set; `TASKS` also overrides the downloader and scripted command defaults.
 For example, `TASKS=U0008 pixi run --locked run-scripted` runs a single task.
 
+The other `run.py` defaults also match the paper runs: `--condition wipe` (memory
+cleared between tasks) and budgets of 300 turns, 4M tokens, 2M simulation steps
+and 3 hours per task.
+
 Run the deterministic reference without a model server:
 
 ```bash

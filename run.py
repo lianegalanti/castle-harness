@@ -139,7 +139,7 @@ def parse_args():
         help=f"Comma-separated task IDs (default paper benchmark: {DEFAULT_TASKS})",
     )
     parser.add_argument("--order-seed", type=int, default=0)
-    parser.add_argument("--condition", choices=["keep", "wipe"], default="keep")
+    parser.add_argument("--condition", choices=["keep", "wipe"], default="wipe")
     parser.add_argument(
         "--backend", choices=["scripted", "anthropic", "openai"], required=True
     )
@@ -159,10 +159,10 @@ def parse_args():
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--out", type=Path, default=Path("out"))
     parser.add_argument("--device", default="cuda:0")
-    parser.add_argument("--max-turns", type=int, default=60)
-    parser.add_argument("--max-total-tokens", type=int, default=400_000)
-    parser.add_argument("--max-sim-steps", type=int, default=200_000)
-    parser.add_argument("--max-wall-s", type=float, default=1800)
+    parser.add_argument("--max-turns", type=int, default=300)
+    parser.add_argument("--max-total-tokens", type=int, default=4_000_000)
+    parser.add_argument("--max-sim-steps", type=int, default=2_000_000)
+    parser.add_argument("--max-wall-s", type=float, default=10800)
     return parser.parse_args()
 
 
