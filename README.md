@@ -39,50 +39,79 @@ Per-task tables, token counts, timings and failure reasons are in
 
 ## Setup
 
-Requirements: Linux x86_64, Python 3.12, an NVIDIA GPU with EGL, the Hugging Face
-CLI (`hf`), and `ffmpeg` for rendering. Serving Qwen3.8-27B in bf16 needs about
-60 GB of free GPU memory.
-
-The harness runs on top of the Castle simulator runtime, which currently lives in a
-separate repository that requires access.
+Use Linux x86_64, [Pixi](https://pixi.sh/), and an NVIDIA GPU with a working
+driver and EGL. Pixi installs Python 3.12, the runtime dependencies, and FFmpeg.
+Model serving remains a separate environment.
 
 ```bash
-bash scripts/setup_castle.sh ./castle-runtime
-export CASTLE_ROOT="$PWD/castle-runtime"
-export PYTHONPATH="$CASTLE_ROOT/.runtime-active:$CASTLE_ROOT:$PWD"
-bash scripts/download_tasks.sh
+pixi install --locked
+pixi run --locked check-runtime
+pixi run --locked download-tasks --tasks S0507,U0008
 ```
+
+The manifest pins both installable distributions to public benchmark commit
+[`4da3f207`](https://github.com/smbml/castle-reasoning-benchmark/tree/4da3f2076990acb858984ae24a8f3609cc105b3a):
+`castle-reasoning-benchmark` and the patched `mujoco-warp` package from
+`third_party/mujoco-warp`. The committed `pixi.lock` fixes the complete harness
+environment. Updating the benchmark requires updating both revisions together
+and regenerating the lockfile. No research checkout, submodule, editable install,
+or PYTHONPATH configuration is needed.
+
+`CASTLE_ROOT` means downloaded task data. It defaults to the ignored `dataset/`
+directory under the invoking directory, created by the download command. Set
+`CASTLE_ROOT` or pass `--root` to `download-tasks` to use another location.
+Downloads reuse the existing HF artifacts at the benchmark's pinned dataset
+revision and verify their source identities and hashes. Both published campaigns
+are supported: 570 `S` targets and 502 `U` targets, totaling 1,072 structures.
+For targets with multiple demonstrations, downloading selects the first accepted
+indexed attempt. Files retain their original campaign paths.
+
+The runner searches both downloaded indices for the first locally available
+accepted attempt per requested target. `CASTLE_INDEX` explicitly selects one
+custom index. Download each requested task before running; normal runs, imports,
+and tests do not download data or generate new campaigns.
 
 ## Running
 
-Serve the model with vLLM:
+Run the deterministic reference without a model server:
 
 ```bash
-bash scripts/serve_qwen.sh
+TASKS=S0507,U0008 pixi run --locked run-scripted
 ```
 
-Then run a setting:
+For language-model evaluation, serve the model separately with
+`bash scripts/serve_qwen.sh`, then run a setting:
 
 ```bash
-bash scripts/run_scripted.sh        # sanity check with true targets
-bash scripts/run_level1.sh          # positions mode
-bash scripts/run_level1_worked.sh   # positions mode + worked example
-bash scripts/run_level2.sh          # image-only
+pixi run --locked run-level1
+pixi run --locked run-level1-worked
+pixi run --locked run-level2
 ```
 
-`BASE_URL`, `MODEL`, `DEVICE` and `OUT_ROOT` override the defaults.
+Download every requested task explicitly before running. `BASE_URL`, `MODEL`,
+`DEVICE`, and `OUT_ROOT` retain their existing meanings; `TASKS` selects scripted
+tasks. The existing `run.py` CLI is also available through `pixi run --locked run`.
+The native runtime check validates installation and a MuJoCo step; it does not
+execute a GPU episode or measure language-model performance.
 
-Render a saved episode to video:
+Render a saved recording:
 
 ```bash
-bash scripts/render.sh TRAJECTORY ATTEMPT_DIR EPISODE_JSONL OUTPUT_MP4 [MIDDLE_PNG]
+pixi run --locked render TRAJECTORY ATTEMPT_DIR EPISODE_JSONL OUTPUT_MP4 [MIDDLE_PNG]
 ```
 
 ## Tests
 
 ```bash
-"$CASTLE_ROOT/.venv/bin/python" -m pytest -q tests/test_harness.py
+pixi run --locked test
 ```
+
+Tests cover harness orchestration, installed Git package identities, runtime
+coordination, data-root handling, and both campaign indices. End-to-end GPU
+validation uses existing HF tasks with the scripted backend, records fresh
+`move_part` executions, and checks the complete runtime success predicate. See
+[runtime integration](docs/runtime-integration.md) for the package boundary, pin
+updates, and a bounded GPU smoke command.
 
 ## Known limitations
 

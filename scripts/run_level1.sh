@@ -3,10 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-: "${CASTLE_ROOT:?Set CASTLE_ROOT to the Castle runtime checkout first}"
-export PYTHONPATH="$CASTLE_ROOT/.runtime-active:$CASTLE_ROOT:$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
-PYTHON="${CASTLE_ROOT}/.venv/bin/python"
+PYTHON="python"
 BASE_URL="${BASE_URL:-http://127.0.0.1:8104/v1}"
 MODEL="${MODEL:-Qwen/Qwen3.8-27B}"
 DEVICE="${DEVICE:-cuda:0}"

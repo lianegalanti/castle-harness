@@ -11,21 +11,20 @@ from typing import Any
 
 import mujoco
 import numpy as np
-from robot_assembly import (
-    active_control,
-    batched_collect,
-    cuboids,
-    gpu,
-    process_stages,
-    tasks,
-    world_slots,
-)
 from scipy.spatial.transform import Rotation
+
+import castle_reasoning.runtime.control.active as active
+import castle_reasoning.runtime.execution.session as session
+import castle_reasoning.runtime.execution.success as success
+import castle_reasoning.runtime.execution.traces as traces
+import castle_reasoning.runtime.execution.workers as workers
+import castle_reasoning.runtime.simulation.robot as robot
+import castle_reasoning.runtime.simulation.world_slots as world_slots
 
 from castle_harness.target_images import render_target_views
 
 
-class _OneWorldGroup(batched_collect.ConstructionGroup):
+class _OneWorldGroup(session.ConstructionGroup):
     """Keep Castle's batched stage controller on a single live world."""
 
     def restore(self, world: int, qpos: np.ndarray, qvel: np.ndarray) -> None:
@@ -161,12 +160,10 @@ class CastleEnv:
             self.demo_final_qpos = replay["qpos"][-1].copy()
         self._output = Path(tempfile.mkdtemp(prefix="castle-env-"))
         self.pool = world_slots.ModelPool([self.model], [0], device=device)
-        self.collector = gpu.make_collector(
+        self.collector = session.make_session(
             self.model,
-            np.asarray(self.plan["target"], dtype=float),
-            1,
-            1,
-            int(self.config.get("seed", 0)),
+            worlds=1,
+            seed=int(self.config.get("seed", 0)),
             device=device,
             native_models=self.pool.native_models,
             capacity_models=[self.model],
@@ -176,7 +173,7 @@ class CastleEnv:
             self.config.get("line_search_threads", 128)
         )
         self.collector.engine.native_models = self.pool.native_models
-        self.collector.controller = active_control.ActivePathControl(self.collector)
+        self.collector.controller = active.ActivePathControl(self.collector)
         self.group = _OneWorldGroup(
             self.collector,
             float("inf"),
@@ -190,12 +187,12 @@ class CastleEnv:
         self.group.planning_watchdog_seconds = float(
             self.config.get("planning_watchdog_seconds", 120)
         )
-        context = process_stages.planner_context(self.group.planner_start_method)
+        context = workers.planner_context(self.group.planner_start_method)
         planning_workers = int(self.config.get("planning_workers", 1))
         self.group.planning_permits = context.BoundedSemaphore(planning_workers)
         self.sim_steps = 0
         self.started = time.perf_counter()
-        self.runner: batched_collect.Runner | None = None
+        self.runner: session.Runner | None = None
         self.reset()
 
     @property
@@ -204,7 +201,7 @@ class CastleEnv:
         return time.perf_counter() - self.started
 
     def _new_runner(self) -> None:
-        self.runner = batched_collect.Runner(
+        self.runner = session.Runner(
             self.group,
             0,
             self.plan,
@@ -265,7 +262,7 @@ class CastleEnv:
         pose = qpos[14 + 7 * part : 21 + 7 * part]
         size = np.asarray(self.plan["sizes"][part], dtype=float)
         angle = float(
-            np.rad2deg(cuboids.orientation_error(pose[None, 3:], size[None])[0])
+            np.rad2deg(success.orientation_error(pose[None, 3:], size[None])[0])
         )
         return {
             "index": part,
@@ -284,7 +281,7 @@ class CastleEnv:
             "parts": [
                 self._part_state(part, qpos) for part in range(self.active_part_count)
             ],
-            "arm_at_home": bool(np.max(np.abs(qpos[:6] - tasks.HOME)) <= 0.04),
+            "arm_at_home": bool(np.max(np.abs(qpos[:6] - robot.HOME)) <= 0.04),
             "gripper_state": {
                 "closure": closure,
                 "open": bool(np.max(np.abs(qpos[6:14])) <= 0.08),
@@ -515,7 +512,7 @@ class CastleEnv:
         if action.shape != (7,) or not np.isfinite(action).all():
             return {"ok": False, "fatal": False, "reason": "invalid_action"}
         try:
-            trace, _ = gpu.run_controls(
+            trace, _ = traces.run_controls(
                 self.collector.controller,
                 1,
                 mode="replay",
@@ -546,7 +543,7 @@ class CastleEnv:
             position_error = float(np.linalg.norm(poses[part, :3] - goals[part]))
             orientation_error = float(
                 np.rad2deg(
-                    cuboids.orientation_error(
+                    success.orientation_error(
                         poses[part : part + 1, 3:],
                         sizes[part : part + 1],
                     )[0]
@@ -622,7 +619,7 @@ class CastleEnv:
                 )
                 if key in check
             }
-            contacts = cuboids.contact_report(self.model, qpos, self.plan["supports"])
+            contacts = success.contact_report(self.model, qpos, self.plan["supports"])
             check["passed"] &= contacts["passed"]
         except Exception as error:  # noqa: BLE001
             try:

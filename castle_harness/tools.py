@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -151,7 +152,7 @@ class ToolDispatcher:
     def _run_python(self, code: str) -> dict[str, Any]:
         try:
             completed = subprocess.run(
-                ["python", "-c", code],
+                [sys.executable, "-c", code],
                 cwd=self.scratch_dir,
                 text=True,
                 capture_output=True,

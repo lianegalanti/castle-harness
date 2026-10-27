@@ -6,3 +6,8 @@ castle-runtime/
 /videos/
 *.mp4
 .DS_Store
+/dataset/
+/runs/
+/.pixi/
+/.pixi-local/
+/.worktrees/

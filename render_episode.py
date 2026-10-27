@@ -13,7 +13,7 @@ os.environ.setdefault("MUJOCO_GL", "egl")
 
 import mujoco
 import numpy as np
-from robot_assembly.artifacts import Cameras
+import castle_reasoning.runtime.rendering.cameras as rendering_cameras
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -396,7 +396,7 @@ def _render_target(model, attempt_dir: Path, target_size: int = 384) -> np.ndarr
     low = np.min(centers - half_sizes, axis=0)
     high = np.max(centers + half_sizes, axis=0)
 
-    cameras = Cameras(model, width=target_size, height=target_size)
+    cameras = rendering_cameras.Cameras(model, width=target_size, height=target_size)
     camera = cameras.cameras[0]
     camera.lookat[:] = (low + high) / 2
     camera.distance = max(0.3, 1.5 * float(np.linalg.norm(high - low)))
@@ -497,7 +497,7 @@ def render_episode(
     if qpos.shape[1] != model.nq or qvel.shape[1] != model.nv:
         raise ValueError("Trajectory qpos/qvel dimensions do not match the model")
     target = _render_target(model, attempt_dir, target_size) if target_panel else None
-    cameras = Cameras(model, width=view_width, height=view_height)
+    cameras = rendering_cameras.Cameras(model, width=view_width, height=view_height)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = output_path.with_name(f"{output_path.stem}.tmp.mp4")
     view_count = 2 if view_index is None else 1
