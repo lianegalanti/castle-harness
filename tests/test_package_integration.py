@@ -6,7 +6,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
+PAPER_TASKS = "U0008,U0080,U0149,U0002,U0007,U0011,U0012,U0024,U0052"
 
 
 def test_runner_defaults_to_dataset_without_creating_it():
@@ -34,7 +37,8 @@ def test_runner_defaults_to_dataset_without_creating_it():
     assert (ROOT / "dataset").exists() == existed
 
 
-def test_scripted_runner_uses_environment_python(tmp_path):
+@pytest.mark.parametrize("tasks", [None, "", "U0008"])
+def test_scripted_runner_uses_environment_python(tmp_path, tasks):
     binary = tmp_path / "bin"
     binary.mkdir()
     receipt = tmp_path / "argv.json"
@@ -42,6 +46,8 @@ def test_scripted_runner_uses_environment_python(tmp_path):
     executable.write_text(
         f"#!{sys.executable}\n"
         "import json, os, pathlib, sys\n"
+        "if sys.argv[1:2] == ['-c']:\n"
+        "    os.execv(sys.executable, [sys.executable, *sys.argv[1:]])\n"
         "pathlib.Path(os.environ['ARGV_LOG']).write_text(json.dumps({"
         "'argv': sys.argv[1:], 'pythonpath': os.environ.get('PYTHONPATH')}))\n"
     )
@@ -52,8 +58,10 @@ def test_scripted_runner_uses_environment_python(tmp_path):
         ARGV_LOG=str(receipt),
         CASTLE_ROOT=str(tmp_path / "data"),
         OUT_ROOT=str(tmp_path / "runs"),
-        TASKS="U0008",
     )
+    environment.pop("TASKS", None)
+    if tasks is not None:
+        environment["TASKS"] = tasks
     result = subprocess.run(
         ["bash", str(ROOT / "scripts/run_scripted.sh")],
         env=environment,
@@ -64,6 +72,9 @@ def test_scripted_runner_uses_environment_python(tmp_path):
     assert result.returncode == 0, result.stderr
     recorded = json.loads(receipt.read_text())
     assert recorded["argv"][0] == str(ROOT / "run.py")
+    assert recorded["argv"][recorded["argv"].index("--tasks") + 1] == (
+        tasks or PAPER_TASKS
+    )
     assert recorded["pythonpath"] == os.environ.get("PYTHONPATH")
     assert not (tmp_path / "data").exists()
 
@@ -236,7 +247,20 @@ def test_explicit_index_overrides_both_packaged_defaults(tmp_path):
     assert not (tmp_path / "data").exists()
 
 
-def test_download_script_calls_installed_castle_reasoning_cli(tmp_path):
+@pytest.mark.parametrize(
+    ("tasks", "arguments", "expected", "root"),
+    [
+        (None, [], PAPER_TASKS, None),
+        ("", [], PAPER_TASKS, None),
+        ("S0074,U0008", [], "S0074,U0008", None),
+        ("U0008", ["--tasks", "S0074"], "S0074", None),
+        (None, ["--root", "custom-data"], PAPER_TASKS, "custom-data"),
+        (None, ["--tasks", "U0080", "--root", "custom-data"], "U0080", "custom-data"),
+    ],
+)
+def test_download_script_calls_installed_castle_reasoning_cli(
+    tmp_path, tasks, arguments, expected, root
+):
     binary = tmp_path / "bin"
     binary.mkdir()
     receipt = tmp_path / "argv.json"
@@ -244,18 +268,31 @@ def test_download_script_calls_installed_castle_reasoning_cli(tmp_path):
     executable.write_text(
         f"#!{sys.executable}\n"
         "import json, os, pathlib, sys\n"
-        "pathlib.Path(os.environ['ARGV_LOG']).write_text(json.dumps({"
-        "'argv': sys.argv[1:], 'pythonpath': os.environ.get('PYTHONPATH')}))\n"
+        "if sys.argv[1:2] == ['-c']:\n"
+        "    os.execv(sys.executable, [sys.executable, *sys.argv[1:]])\n"
+        "recorded = {'argv': sys.argv[1:], 'pythonpath': os.environ.get('PYTHONPATH')}\n"
+        "from castle_reasoning import cli\n"
+        "def download(tasks, root, **kwargs):\n"
+        "    recorded.update(tasks=tasks, root=root)\n"
+        "    return {'repo_id': 'fixture', 'revision': 'fixture', 'files': {},\n"
+        "            'tasks': dict.fromkeys(tasks), 'selected_bytes': 0}\n"
+        "cli.data_download.download_tasks = download\n"
+        "sys.argv = ['castle-benchmark', *sys.argv[3:]]\n"
+        "cli.main()\n"
+        "pathlib.Path(os.environ['ARGV_LOG']).write_text(json.dumps(recorded))\n"
     )
     executable.chmod(0o755)
     environment = dict(
         os.environ,
         PATH=f"{binary}:{os.environ['PATH']}",
         ARGV_LOG=str(receipt),
-        TASKS="S0074,U0008",
     )
+    environment.pop("TASKS", None)
+    if tasks is not None:
+        environment["TASKS"] = tasks
     result = subprocess.run(
-        ["bash", str(ROOT / "scripts/download_tasks.sh")],
+        ["bash", str(ROOT / "scripts/download_tasks.sh"), *arguments],
+        cwd=ROOT,
         env=environment,
         capture_output=True,
         text=True,
@@ -263,11 +300,11 @@ def test_download_script_calls_installed_castle_reasoning_cli(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     recorded = json.loads(receipt.read_text())
-    assert recorded["argv"] == [
+    assert recorded["argv"][:3] == [
         "-m",
         "castle_reasoning.cli",
         "download",
-        "--tasks",
-        "S0074,U0008",
     ]
+    assert recorded["tasks"] == expected.split(",")
+    assert recorded["root"] == root
     assert recorded["pythonpath"] == os.environ.get("PYTHONPATH")

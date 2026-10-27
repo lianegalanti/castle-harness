@@ -389,6 +389,8 @@ def test_resume_skips_completed_tasks_and_preserves_keep_memory(monkeypatch, tmp
             "scripted",
             "--out",
             str(output),
+            "--condition",
+            "keep",
             "--resume",
         ],
     )
@@ -612,6 +614,22 @@ def test_empty_text_uses_the_most_recent_text_in_gray():
     assert text == ["(no comment)"]
     assert color == (255, 255, 255)
     assert previous is None
+
+
+@pytest.mark.parametrize(
+    ("tasks", "expected"),
+    [
+        (None, "U0008,U0080,U0149,U0002,U0007,U0011,U0012,U0024,U0052"),
+        ("U0008", "U0008"),
+        ("S0074,U0008", "S0074,U0008"),
+    ],
+)
+def test_runner_task_selection(monkeypatch, tasks, expected):
+    arguments = ["run.py", "--backend", "scripted"]
+    if tasks is not None:
+        arguments.extend(["--tasks", tasks])
+    monkeypatch.setattr(sys, "argv", arguments)
+    assert harness_run.parse_args().tasks == expected
 
 
 def test_trajectory_recording_is_disabled_by_default(monkeypatch):

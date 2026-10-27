@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -eq 0 ]]; then
-  set -- --tasks "${TASKS:-U0008}"
-fi
-exec python -m castle_reasoning.cli download "$@"
+# argparse uses the last --tasks value, so explicit flags override this default.
+exec python -m castle_reasoning.cli download \
+  --tasks "${TASKS:-$(python -c 'from castle_harness.tasks import DEFAULT_TASKS; print(DEFAULT_TASKS)')}" \
+  "$@"
