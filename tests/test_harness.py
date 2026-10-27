@@ -11,9 +11,10 @@ from urllib.error import HTTPError
 import numpy as np
 import pytest
 
+import castle_harness.agent as harness_agent
 import castle_harness.backends as harness_backends
 import run as harness_run
-from castle_harness.agent import Budgets, run_episode
+from castle_harness.agent import ONE_MOVE_PER_TURN_ERROR, Budgets, run_episode
 from castle_harness.backends import AnthropicBackend, OpenAIBackend, ScriptedBackend
 from castle_harness.env import CastleEnv, _TrajectoryBuffer
 from castle_harness.target_images import render_target_views
@@ -192,9 +193,7 @@ def test_get_task_appends_image_references_after_tool_messages(tmp_path):
         json.loads(line)
         for line in (tmp_path / "episode.jsonl").read_text().splitlines()
     ]
-    assert records[0]["messages"][-1]["content"][1]["image_url"]["url"].endswith(
-        "top.png"
-    )
+    assert records[0]["messages"][-1]["content"][1]["image_url"]["url"] == "top.png"
 
 
 def test_openai_serializes_image_reference_as_data_url(tmp_path):
@@ -881,3 +880,102 @@ def test_openai_http_400_is_not_retried(monkeypatch):
     assert calls == [42]
     assert backoffs == []
     assert events == []
+
+
+class TwoMovesBackend:
+    def __init__(self):
+        self.tools = []
+
+    def respond(self, _messages, tools):
+        self.tools.append(tools)
+        if len(self.tools) == 1:
+            calls = [
+                {"id": f"move-{part}", "name": "move_part",
+                 "arguments": {"part": part, "x": 0, "y": 0, "z": 0}}
+                for part in (0, 1)
+            ]
+        else:
+            calls = [{"id": "submit", "name": "submit", "arguments": {}}]
+        return {"content": "", "tool_calls": calls}, {
+            "input_tokens": 1,
+            "output_tokens": 1,
+        }
+
+
+def test_only_one_move_part_runs_per_turn(tmp_path):
+    env = FakeEnv()
+    run_episode(
+        env,
+        TwoMovesBackend(),
+        tmp_path / "memory",
+        Budgets(max_turns=3),
+        tmp_path / "episode.jsonl",
+    )
+    assert env.sim_steps == 3
+    first = json.loads((tmp_path / "episode.jsonl").read_text().splitlines()[0])
+    assert first["tool_results"][0]["result"]["ok"]
+    assert first["tool_results"][1]["result"] == {
+        "ok": False,
+        "error": ONE_MOVE_PER_TURN_ERROR,
+    }
+
+
+def test_episode_log_records_only_new_messages(tmp_path):
+    run_episode(
+        FakeEnv(),
+        EmptyBackend(),
+        tmp_path / "memory",
+        Budgets(max_turns=2),
+        tmp_path / "episode.jsonl",
+    )
+    records = [
+        json.loads(line)
+        for line in (tmp_path / "episode.jsonl").read_text().splitlines()
+    ]
+    assert [m["role"] for m in records[0]["messages"]] == [
+        "system",
+        "user",
+        "assistant",
+    ]
+    assert [m["role"] for m in records[1]["messages"]] == ["assistant"]
+
+
+def test_image_mode_get_task_description_omits_positions(tmp_path):
+    env = FakeEnv()
+    env.target_mode = "image"
+    backend = TwoMovesBackend()
+    run_episode(
+        env, backend, tmp_path / "memory", Budgets(max_turns=1), tmp_path / "e.jsonl"
+    )
+    get_task = next(
+        tool for tool in backend.tools[0] if tool["function"]["name"] == "get_task"
+    )
+    assert "not given" in get_task["function"]["description"]
+
+
+def test_run_python_does_not_inherit_harness_environment(tmp_path, monkeypatch):
+    monkeypatch.setenv("CASTLE_ROOT", "/private/castle")
+    dispatcher = ToolDispatcher(FakeEnv(), tmp_path / "memory", tmp_path / "scratch")
+    output = dispatcher.dispatch(
+        "run_python", {"code": "import os; print(os.environ.get('CASTLE_ROOT'))"}
+    )
+    assert output["stdout"].strip() == "None"
+
+
+def test_episode_scratch_directory_is_removed(tmp_path, monkeypatch):
+    scratch = tmp_path / "scratch"
+
+    def fake_mkdtemp(prefix):
+        scratch.mkdir()
+        return str(scratch)
+
+    monkeypatch.setattr(harness_agent.tempfile, "mkdtemp", fake_mkdtemp)
+    run_episode(
+        FakeEnv(),
+        EmptyBackend(),
+        tmp_path / "memory",
+        Budgets(max_turns=1),
+        tmp_path / "episode.jsonl",
+    )
+    assert not scratch.exists()
+    assert (tmp_path / "memory").exists()

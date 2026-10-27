@@ -15,6 +15,8 @@ import mujoco
 import numpy as np
 import castle_reasoning.runtime.rendering.cameras as rendering_cameras
 
+from castle_harness.agent import ONE_MOVE_PER_TURN_ERROR
+
 try:
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:
@@ -148,9 +150,17 @@ def _map_episode_text_to_segments(
             content = arguments.get("content", "")
             pending.append(f"write_memory {path} (+{len(str(content))} chars)")
 
+        # Moves the harness refused (second move_part in a turn) never ran,
+        # so they have no trajectory segment.
+        blocked = {
+            result.get("id")
+            for result in turn.get("tool_results", [])
+            if isinstance(result.get("result"), dict)
+            and result["result"].get("error") == ONE_MOVE_PER_TURN_ERROR
+        }
         for call in calls:
             name = call.get("name")
-            if name not in segment_tools:
+            if name not in segment_tools or call.get("id") in blocked:
                 continue
             if pointer >= len(mapped):
                 raise ValueError(

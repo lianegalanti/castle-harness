@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -65,6 +67,22 @@ TOOL_SCHEMAS = [
         ["path", "content"],
     ),
 ]
+
+
+IMAGE_GET_TASK_DESCRIPTION = (
+    "Get part sizes and three target drawings (top, front, side). "
+    "Target positions are not given."
+)
+
+
+def tool_schemas(target_mode: str = "positions") -> list[dict[str, Any]]:
+    """Return tool schemas whose get_task description matches the target mode."""
+    schemas = copy.deepcopy(TOOL_SCHEMAS)
+    if target_mode == "image":
+        for schema in schemas:
+            if schema["function"]["name"] == "get_task":
+                schema["function"]["description"] = IMAGE_GET_TASK_DESCRIPTION
+    return schemas
 
 
 class ToolDispatcher:
@@ -150,10 +168,15 @@ class ToolDispatcher:
         return result
 
     def _run_python(self, code: str) -> dict[str, Any]:
+        # Isolated mode and a minimal environment keep the harness's PYTHONPATH,
+        # CASTLE_ROOT and API keys out of model code. This is not a sandbox:
+        # absolute paths on the filesystem are still readable.
+        env = {"PATH": os.environ.get("PATH", ""), "HOME": str(self.scratch_dir)}
         try:
             completed = subprocess.run(
-                [sys.executable, "-c", code],
+                [sys.executable, "-I", "-c", code],
                 cwd=self.scratch_dir,
+                env=env,
                 text=True,
                 capture_output=True,
                 timeout=60,

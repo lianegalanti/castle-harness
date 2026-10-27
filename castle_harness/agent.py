@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import json
+import os
+import shutil
 import tempfile
 import time
 from pathlib import Path
 from typing import Any
 
-from castle_harness.tools import TOOL_SCHEMAS, ToolDispatcher
+from castle_harness.tools import ToolDispatcher, tool_schemas
+
+ONE_MOVE_PER_TURN_ERROR = (
+    "only one move_part runs per turn; call it again after you see this move's result"
+)
 
 
 @dataclasses.dataclass
@@ -36,6 +43,24 @@ def _exhausted(
     return None
 
 
+def _messages_for_log(messages: list[dict[str, Any]], log_dir: Path) -> list:
+    """Copy messages with image paths made relative to the log directory."""
+    logged = copy.deepcopy(messages)
+    for message in logged:
+        content = message.get("content")
+        if not isinstance(content, list):
+            continue
+        for part in content:
+            if isinstance(part, dict) and part.get("type") == "image_url":
+                url = part["image_url"].get("url", "")
+                if url.startswith("/"):
+                    try:
+                        part["image_url"]["url"] = os.path.relpath(url, log_dir)
+                    except ValueError:
+                        part["image_url"]["url"] = Path(url).name
+    return logged
+
+
 def run_episode(
     env,
     backend,
@@ -58,7 +83,9 @@ def run_episode(
     dispatcher = ToolDispatcher(env, memory_dir, scratch)
     log_path = Path(log_path)
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    schemas = tool_schemas(getattr(env, "target_mode", "positions"))
     totals = {"input_tokens": 0, "output_tokens": 0}
+    logged_upto = 0
     turns = 0
     tool_error = False
     exhausted = None
@@ -84,7 +111,7 @@ def run_episode(
             if set_event_handler is not None:
                 set_event_handler(log_backend_event)
             try:
-                assistant, usage = backend.respond(messages, TOOL_SCHEMAS)
+                assistant, usage = backend.respond(messages, schemas)
             finally:
                 if set_event_handler is not None:
                     set_event_handler(None)
@@ -94,9 +121,14 @@ def run_episode(
             messages.append({"role": "assistant", **assistant})
             tool_results = []
             requested_images = []
+            moved_this_turn = False
             for call in assistant.get("tool_calls", []):
                 try:
-                    result = dispatcher.dispatch(call["name"], call["arguments"])
+                    if call["name"] == "move_part" and moved_this_turn:
+                        result = {"ok": False, "error": ONE_MOVE_PER_TURN_ERROR}
+                    else:
+                        result = dispatcher.dispatch(call["name"], call["arguments"])
+                        moved_this_turn |= call["name"] == "move_part"
                 except Exception as error:  # noqa: BLE001
                     tool_error = True
                     result = {
@@ -145,9 +177,11 @@ def run_episode(
                         }
                     )
                 messages.append({"role": "user", "content": content})
+            # Log only the messages added this turn; earlier ones are in earlier
+            # records, so the full history is the concatenation of all records.
             record = {
                 "turn": turns,
-                "messages": messages,
+                "messages": _messages_for_log(messages[logged_upto:], log_path.parent),
                 "tool_calls": assistant.get("tool_calls", []),
                 "tool_results": tool_results,
                 "usage": usage,
@@ -156,8 +190,10 @@ def run_episode(
                     "episode_s": time.perf_counter() - started,
                 },
             }
+            logged_upto = len(messages)
             log.write(json.dumps(record, allow_nan=False) + "\n")
             log.flush()
+    shutil.rmtree(scratch, ignore_errors=True)
     if dispatcher.terminal_result is None:
         try:
             terminal = env.check()
